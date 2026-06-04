@@ -83,8 +83,15 @@ impl Zim {
 
         let (header, mime_table) = parse_header(&master_view)?;
         let url_list = parse_url_list(&master_view, header.url_ptr_pos, header.article_count)?;
-        let article_list =
-            parse_article_list(&master_view, header.title_ptr_pos, header.article_count)?;
+        // Modern ZIMs (header minor version >= 2) no longer carry the legacy title
+        // pointer list: titlePtrPos is set to the all-ones sentinel (u64::MAX) and the
+        // title ordering lives in the `X/listing/titleOrdered/v1` entry instead. Slicing
+        // the mmap at u64::MAX would fail with OutOfBounds, so treat it as "no list".
+        let article_list = if header.title_ptr_pos == u64::MAX {
+            Vec::new()
+        } else {
+            parse_article_list(&master_view, header.title_ptr_pos, header.article_count)?
+        };
 
         let cluster_list =
             parse_cluster_list(&master_view, header.cluster_ptr_pos, header.cluster_count)?;
@@ -104,8 +111,11 @@ impl Zim {
     }
 
     /// Get the number of articles.
+    ///
+    /// Derived from the URL pointer list (always present and `article_count` long),
+    /// not the title pointer list, which modern ZIMs omit (see `Zim::new`).
     pub fn article_count(&self) -> usize {
-        self.article_list.len()
+        self.url_list.len()
     }
 
     /// Computes the checksum, and returns an error if it does not match the one in
