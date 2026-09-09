@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use byteorder::{LittleEndian, ReadBytesExt};
 use md5::digest::OutputSizeUser;
 use md5::{digest::generic_array::GenericArray, Digest, Md5};
-use memmap::Mmap;
+use memmap2::Mmap;
 
 use crate::cluster::Cluster;
 use crate::directory_entry::DirectoryEntry;
@@ -150,7 +150,7 @@ impl Zim {
     /// Iterates over articles, sorted by URL.
     ///
     /// For performance reasons, you might want to extract by cluster instead.
-    pub fn iterate_by_urls(&self) -> DirectoryIterator {
+    pub fn iterate_by_urls(&self) -> DirectoryIterator<'_> {
         DirectoryIterator::new(self)
     }
 
@@ -167,7 +167,7 @@ impl Zim {
     /// Returns the given `Cluster`
     ///
     /// idx must be between 0 and `cluster_count`
-    pub fn get_cluster(&self, idx: u32) -> Result<Cluster> {
+    pub fn get_cluster(&self, idx: u32) -> Result<Cluster<'_>> {
         Cluster::new(
             &self.master_view,
             &self.cluster_list,

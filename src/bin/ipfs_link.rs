@@ -1,6 +1,5 @@
 extern crate clap;
 extern crate pbr;
-extern crate stopwatch;
 extern crate zim;
 
 use clap::Parser;
@@ -10,7 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::thread;
-use stopwatch::Stopwatch;
+use std::time::Instant;
 use zim::{Target, Zim};
 
 /// Link ipfs files via 'ipfs files' api.
@@ -37,7 +36,7 @@ fn main() {
     mb.println(&format!("Linking files using {} into {}:", input, root));
     mb.println("");
 
-    let sw = Stopwatch::start_new();
+    let sw = Instant::now();
 
     let zim = Zim::new(input).ok().unwrap();
 
@@ -97,5 +96,5 @@ fn main() {
     f.write_all(ops.join("\n").as_bytes()).unwrap();
     f.sync_data().unwrap();
 
-    p3.finish_print(&format!("Linking done in {}ms", sw.elapsed_ms()));
+    p3.finish_print(&format!("Linking done in {}ms", sw.elapsed().as_millis()));
 }
