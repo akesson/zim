@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 
 use bitreader::BitReader;
 use byteorder::{LittleEndian, ReadBytesExt};
-use memmap::Mmap;
+use memmap2::Mmap;
 use ouroboros::self_referencing;
 use xz2::read::XzDecoder;
 
@@ -309,4 +309,43 @@ fn parse_blob_list<T: ReadBytesExt>(mut cur: T, extended: bool) -> Result<Vec<u6
     }
 
     Ok(blob_list)
+}
+
+#[cfg(test)]
+mod dependency_tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn blobs_survive_codec_and_guard_updates() {
+        // One blob, with two 32-bit offsets (8 = start, 13 = end).
+        let raw = [8, 0, 0, 0, 13, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
+        let mut xz = xz2::write::XzEncoder::new(Vec::new(), 6);
+        xz.write_all(&raw).unwrap();
+        for (compression, bytes) in [
+            (Compression::None, raw.to_vec()),
+            (Compression::Lzma2, xz.finish().unwrap()),
+            (
+                Compression::Zstd,
+                zstd::stream::encode_all(&raw[..], 1).unwrap(),
+            ),
+        ] {
+            let mut encoded = vec![u8::from(compression)];
+            encoded.extend(bytes);
+            let mut map = memmap2::MmapMut::map_anon(encoded.len()).unwrap();
+            map.copy_from_slice(&encoded);
+            let map = map.make_read_only().unwrap();
+            let offsets = vec![0];
+            let cluster = Cluster::new(&map, &offsets, 0, encoded.len() as u64, 6).unwrap();
+            let clone = cluster.clone();
+            {
+                let blob = cluster.get_blob(0).unwrap();
+                assert_eq!(&*blob, b"hello");
+                assert_eq!(&*clone.get_blob(0).unwrap(), b"hello");
+            }
+            // Reacquire the write lock after the self-referential read guards drop.
+            clone.decompress().unwrap();
+            assert_eq!(&*clone.get_blob(0).unwrap(), b"hello");
+        }
+    }
 }

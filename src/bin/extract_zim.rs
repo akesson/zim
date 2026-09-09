@@ -7,7 +7,7 @@ use std::time::Duration;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use stopwatch::Stopwatch;
+use std::time::Instant;
 use zim::{Cluster, DirectoryEntry, MimeType, Namespace, Target, Zim};
 
 /// Extract zim files into their on disk structure.
@@ -41,7 +41,7 @@ fn main() {
     println!("Generating symlinks: {}", !skip_link);
     println!("Generating copies for links: {}", flatten_link);
 
-    let sw = Stopwatch::start_new();
+    let sw = Instant::now();
     let zim_file = Zim::new(input).expect("failed to parse input");
 
     if let Some(main_page_idx) = zim_file.header.main_page {
@@ -103,7 +103,7 @@ fn main() {
 
     pb.finish_with_message(format!(
         "Extraction done in {}s",
-        sw.elapsed_ms() as f64 / 1000.
+        sw.elapsed().as_secs_f64()
     ));
 }
 
